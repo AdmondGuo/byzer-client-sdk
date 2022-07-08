@@ -76,9 +76,9 @@ object LeftSemiOrAnti {
 
 case class JoinMeta(__meta: MetaMeta, _tag: Option[String], _isReady: Boolean, _autogenTableName: String,
                     _tableName: String, _from: String,
-                    _joinTable: List[String],
+                    _joinTable: List[Option[String]],
                     _on:Option[List[AndOrOptMeta]],
-                    _leftColumns: Option[String], _rightColumns: List[String])
+                    _leftColumns: Option[String], _rightColumns: List[Option[String]])
 
 /**
  * Byzer().join.from(...).left(...).on(...).leftColumns(....).rightColumns(.....)
@@ -91,11 +91,11 @@ class Join(parent: Byzer) extends BaseNode {
 
   private var _from = parent.lastTableName
 
-  private var _joinTable = new ArrayBuffer[String]()
+  private var _joinTable = new ArrayBuffer[Option[String]]()
   private var _on = ArrayBuffer[BaseOpt]()
 
   private var _leftColumns: Option[String] = None
-  private var _rightColumns = new ArrayBuffer[String]()
+  private var _rightColumns = new ArrayBuffer[Option[String]]()
 
   override def fromJson(json: String): BaseNode = {
 
@@ -200,13 +200,13 @@ class Join(parent: Byzer) extends BaseNode {
 
     var joinClause: ArrayBuffer[String] = new ArrayBuffer[String]()
     for( flag <- _joinTable.indices) {
-//      val joinTable = _joinTable(flag).get
-//      val cla = _on(flag).toFilterNode.toFragment
-//      joinClause += s"${joinTable} on ${cla}"
+      val joinTable = _joinTable(flag).get
+      val cla = _on(flag).toFilterNode.toFragment
+      joinClause += s"${joinTable} on ${cla}"
       println(flag)
     }
 
-    s"""select ${_leftColumns.get},${_rightColumns.map(col=>col).mkString(",")}
+    s"""select ${_leftColumns.get},${_rightColumns.map(col=>col.get).mkString(",")}
     |from ${_from}
     |${joinClause.mkString("\n")}
     |as ${_tableName};""".stripMargin
@@ -219,7 +219,7 @@ class Join(parent: Byzer) extends BaseNode {
   }
 
   def rightColumns(expr: Expr) = {
-    _rightColumns += expr.toFragment
+    _rightColumns += Some(expr.toFragment)
     this
   }
 
@@ -236,37 +236,37 @@ class Join(parent: Byzer) extends BaseNode {
   }
 
   def left(expr: Expr) = {
-    _joinTable += s"""${LeftOuter.sql} ${expr.toFragment}"""
+    _joinTable += Some(s"""${LeftOuter.sql} ${expr.toFragment}""")
     this
   }
 
   def right(expr: Expr) = {
-    _joinTable += (s"""${RightOuter.sql} ${expr.toFragment}""")
+    _joinTable += Some(s"""${RightOuter.sql} ${expr.toFragment}""")
     this
   }
 
   def inner(expr: Expr) = {
-    _joinTable += (s"""${Inner.sql} ${expr.toFragment}""")
+    _joinTable += Some(s"""${Inner.sql} ${expr.toFragment}""")
     this
   }
 
   def fullouter(expr: Expr) = {
-    _joinTable += (s"""${FullOuter.sql} ${expr.toFragment}""")
+    _joinTable += Some(s"""${FullOuter.sql} ${expr.toFragment}""")
     this
   }
 
   def leftsemi(expr: Expr) = {
-    _joinTable += (s"""${LeftSemi.sql} ${expr.toFragment}""")
+    _joinTable += Some(s"""${LeftSemi.sql} ${expr.toFragment}""")
     this
   }
 
   def leftanti(expr: Expr) = {
-    _joinTable += (s"""${LeftAnti.sql} ${expr.toFragment}""")
+    _joinTable += Some(s"""${LeftAnti.sql} ${expr.toFragment}""")
     this
   }
 
   def cross(expr: Expr) = {
-    _joinTable += (s"""${Cross.sql} ${expr.toFragment}""")
+    _joinTable += Some(s"""${Cross.sql} ${expr.toFragment}""")
     this
   }
 
