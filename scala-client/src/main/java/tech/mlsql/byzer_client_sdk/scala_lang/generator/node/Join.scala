@@ -128,7 +128,11 @@ class Join(parent: Byzer) extends BaseNode {
     _autogenTableName = v._autogenTableName
     _tableName = v._tableName
     _from = v._from
-    _joinTable = v._joinTable.to[ArrayBuffer]
+    _joinTable = {
+      var cc = new ArrayBuffer[Option[String]]()
+      v._joinTable.foreach(j => cc += Some(j.get))
+      cc
+    }
     _rightColumns = v._rightColumns.to[ArrayBuffer]
     this
   }
