@@ -166,22 +166,41 @@ class ByzerScriptTest extends AnyFunSuite {
     val byzer = Byzer()
     val table1 = byzer.load.format("csv").path("/tmp/jack").options().add("header", "true").end
     val table2 = byzer.load.format("csv").path("/tmp/william").options().add("header", "true").end
-    table1.end
-    table2.end
+    val table3 = byzer.load.format("csv").path("/tmp/admond").options().add("header", "true").end
+    table1.namedTableName("table1").end
+    table2.namedTableName("table2").end
+    table3.namedTableName("table3").end
 
     val t1 = table1.tableName
     val t2 = table2.tableName
+    val t3 = table3.tableName
 
     val f = byzer.join.
       from(Expr(Some(t1))).
       left(Expr(Some(t2))).
       on_and.add(Expr(Some(s"""${t1}.a=${t2}.b"""))).add(Expr(Some(s"""${t1}.a=${t2}.c"""))).end.
       leftColumns(Expr(Some(s"${t1}.a,${t1}.c"))).
-      rightColumns(Expr(Some(s"""${t2}.m"""))).end
-    println(f.toJson(true))
-    val v = Byzer().fromJson(f.toJson())
+      rightColumns(Expr(Some(s"""${t2}.m"""))).
+      right(Expr(Some(t3))).
+      on_and.add(Expr(Some(s"""${t1}.a=${t3}.d"""))).add(Expr(Some(s"""${t1}.a=${t3}.e"""))).end.
+      rightColumns(Expr(Some(s"""${t3}.n""")))
+      .namedTableName("joinTable").end
 
-    println(v.toScript)
+    val jsonStr = f.toJson(true)
+    println(jsonStr)
+
+    val byzerV2 = Byzer().fromJson(f.toJson())
+
+    val script = byzerV2.toScript
+    val expectScript = """load csv.`/tmp/jack` where `header`='''true''' as table1;
+                         |load csv.`/tmp/william` where `header`='''true''' as table2;
+                         |load csv.`/tmp/admond` where `header`='''true''' as table3;
+                         |select table1.a,table1.c,LEFT OUTER JOIN table2,RIGHT OUTER JOIN table3
+                         |from table1
+                         |LEFT OUTER JOIN table2 on (table1.a=table2.b and table1.a=table2.c)
+                         |RIGHT OUTER JOIN table3 on (table1.a=table3.d and table1.a=table3.e)
+                         |as joinTable;""".stripMargin
+    assert(script == expectScript)
   }
 
   /**

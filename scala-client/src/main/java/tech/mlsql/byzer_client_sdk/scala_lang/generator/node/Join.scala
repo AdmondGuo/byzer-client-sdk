@@ -100,9 +100,9 @@ class Join(parent: Byzer) extends BaseNode {
   override def fromJson(json: String): BaseNode = {
 
     val obj = JSONObject.fromObject(json)
-    val clauseTemp = obj.remove("_on")
+    val onClauseTemp = obj.remove("_on")
 
-    clauseTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
+    onClauseTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
       val t = item.asInstanceOf[JSONObject]
       val opt = Class.forName(t.getJSONObject("__meta").getString("name")).
         getConstructor(classOf[BaseNode]).
@@ -122,24 +122,31 @@ class Join(parent: Byzer) extends BaseNode {
       _on += opt
     }
 
+    val joinTableTemp = obj.remove("_joinTable")
+    joinTableTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
+      val itemStr = item.asInstanceOf[String]
+      _joinTable += Some(itemStr)
+    }
+
+    val rightColumnsTemp = obj.remove("_rightColumns")
+    joinTableTemp.asInstanceOf[JSONArray].asScala.foreach { item =>
+      val itemStr = item.asInstanceOf[String]
+      _rightColumns += Some(itemStr)
+    }
+
     val v = JSONTool.parseJson[JoinMeta](obj.toString)
     _tag = v._tag
     _isReady = v._isReady
     _autogenTableName = v._autogenTableName
+    _leftColumns = v._leftColumns
     _tableName = v._tableName
     _from = v._from
-    _joinTable = {
-      var cc = new ArrayBuffer[Option[String]]()
-      v._joinTable.foreach(j => cc += Some(j.get))
-      cc
-    }
-    _rightColumns = v._rightColumns.to[ArrayBuffer]
     this
   }
 
   override def toJson: String = {
 
-    val clauses = _on.map { item =>
+    val onClauses = _on.map { item =>
       item match {
         case _ if item.isInstanceOf[AndOpt[Join]] =>
           AndOrOptMeta(MetaMeta(classOf[AndOpt[Join]].getName), item.asInstanceOf[AndOpt[Join]]._clauses.map { t =>
@@ -160,7 +167,7 @@ class Join(parent: Byzer) extends BaseNode {
       _tableName = _tableName,
       _from = _from,
       _joinTable = _joinTable.toList,
-      _on = Some(clauses.toList),
+      _on = Some(onClauses.toList),
       _leftColumns = _leftColumns,
       _rightColumns = _rightColumns.toList,
     ))
@@ -197,6 +204,7 @@ class Join(parent: Byzer) extends BaseNode {
   override def options(): Options = ???
 
   override def toBlock: String = {
+    require(_isReady, "end is not called")
     if (_joinTable.size != _on.size) {
       throw new RuntimeException(s"${_joinTable.size} join() but ${_on.size} on(), " +
         s"the join method must correspond to the on method one by one!")
@@ -207,7 +215,6 @@ class Join(parent: Byzer) extends BaseNode {
       val joinTable = _joinTable(flag).get
       val cla = _on(flag).toFilterNode.toFragment
       joinClause += s"${joinTable} on ${cla}"
-      println(flag)
     }
 
     s"""select ${_leftColumns.get},${_rightColumns.map(col=>col.get).mkString(",")}
